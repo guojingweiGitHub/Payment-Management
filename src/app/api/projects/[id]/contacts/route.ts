@@ -39,7 +39,7 @@ export async function POST(
       contact_time: body.contact_time,
       delay_reason: body.delay_reason,
       notes: body.notes,
-      attachment_key: body.attachment_key
+      attachments: body.attachments
     })
     .select()
     .single();

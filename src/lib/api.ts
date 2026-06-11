@@ -15,8 +15,11 @@ export interface Project {
   is_expired: boolean;
   project_manager: string | null;
   contract_amount: string | null;
+  agreement_amount: string | null;
+  actual_amount: string | null;
+  final_amount: string | null;
   payment_status: string;
-  attachment_key: string | null;
+  attachments: Array<{key: string; name: string; type: string; size: number}> | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -27,7 +30,7 @@ export interface ContactRecord {
   contact_time: string;
   delay_reason: string | null;
   notes: string | null;
-  attachment_key: string | null;
+  attachments: Array<{key: string; name: string; type: string; size: number}> | null;
   created_at: string;
 }
 
@@ -92,6 +95,10 @@ export async function createProject(project: {
   expected_payment_date: string;
   project_manager?: string;
   contract_amount?: string;
+  agreement_amount?: string;
+  actual_amount?: string;
+  final_amount?: string;
+  attachments?: Array<{key: string; name: string; type: string; size: number}>;
 }): Promise<Project> {
   const response = await fetch(`${API_BASE}/projects`, {
     method: 'POST',
@@ -152,7 +159,7 @@ export async function createContactRecord(projectId: number, record: {
   contact_time: string;
   delay_reason?: string;
   notes?: string;
-  attachment_key?: string;
+  attachments?: Array<{key: string; name: string; type: string; size: number}>;
 }): Promise<ContactRecord> {
   const response = await fetch(`${API_BASE}/projects/${projectId}/contacts`, {
     method: 'POST',

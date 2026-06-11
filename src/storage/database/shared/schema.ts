@@ -1,4 +1,4 @@
-import { pgTable, serial, timestamp, varchar, numeric, boolean, text, index } from "drizzle-orm/pg-core"
+import { pgTable, serial, timestamp, varchar, numeric, boolean, text, index, jsonb } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -32,12 +32,18 @@ export const projects = pgTable(
 		is_expired: boolean("is_expired").default(false).notNull(),
 		// 项目负责人
 		project_manager: varchar("project_manager", { length: 100 }),
-		// 合同总额（金额用 numeric，精度10，小数2）
-		contract_amount: numeric("contract_amount", { precision: 10, scale: 2 }),
+		// 合同总额（金额用 numeric，精度12，小数2）
+		contract_amount: numeric("contract_amount", { precision: 12, scale: 2 }),
+		// 协议金额
+		agreement_amount: numeric("agreement_amount", { precision: 12, scale: 2 }),
+		// 实际金额
+		actual_amount: numeric("actual_amount", { precision: 12, scale: 2 }),
+		// 决算金额
+		final_amount: numeric("final_amount", { precision: 12, scale: 2 }),
 		// 缴费状态（未缴费/已缴费）
 		payment_status: varchar("payment_status", { length: 20 }).default("未缴费").notNull(),
-		// 附件（存储对象存储的 key）
-		attachment_key: text("attachment_key"),
+		// 附件列表（存储对象存储的 key 数组，JSONB格式）
+		attachments: jsonb("attachments").$type<Array<{key: string; name: string; type: string; size: number}>>(),
 		// 创建时间
 		created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		// 更新时间
@@ -70,8 +76,8 @@ export const contactRecords = pgTable(
 		delay_reason: text("delay_reason"),
 		// 备注
 		notes: text("notes"),
-		// 附件（存储对象存储的 key）
-		attachment_key: text("attachment_key"),
+		// 附件列表（存储对象存储的 key 数组，JSONB格式）
+		attachments: jsonb("attachments").$type<Array<{key: string; name: string; type: string; size: number}>>(),
 		// 创建时间
 		created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 	},
