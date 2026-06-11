@@ -34,10 +34,10 @@ export async function GET(request: NextRequest) {
   if (clientPhone) {
     query = query.ilike('client_phone', `%${clientPhone}%`);
   }
-  if (paymentStatus) {
+  if (paymentStatus && paymentStatus !== 'all') {
     query = query.eq('payment_status', paymentStatus);
   }
-  if (isExpired) {
+  if (isExpired && isExpired !== 'all') {
     query = query.eq('is_expired', isExpired === 'true');
   }
   

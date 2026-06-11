@@ -33,8 +33,8 @@ export default function HomePage() {
     project_code: "",
     company_name: "",
     client_phone: "",
-    payment_status: "",
-    is_expired: "",
+    payment_status: "all",
+    is_expired: "all",
     days_before_expired: ""
   });
   
@@ -113,8 +113,8 @@ export default function HomePage() {
       project_code: "",
       company_name: "",
       client_phone: "",
-      payment_status: "",
-      is_expired: "",
+      payment_status: "all",
+      is_expired: "all",
       days_before_expired: ""
     });
     setPage(1);
@@ -344,7 +344,7 @@ export default function HomePage() {
                     <SelectValue placeholder="全部" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部</SelectItem>
+                    <SelectItem value="all">全部</SelectItem>
                     <SelectItem value="未缴费">未缴费</SelectItem>
                     <SelectItem value="已缴费">已缴费</SelectItem>
                   </SelectContent>
@@ -360,7 +360,7 @@ export default function HomePage() {
                     <SelectValue placeholder="全部" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部</SelectItem>
+                    <SelectItem value="all">全部</SelectItem>
                     <SelectItem value="true">已到期</SelectItem>
                     <SelectItem value="false">未到期</SelectItem>
                   </SelectContent>

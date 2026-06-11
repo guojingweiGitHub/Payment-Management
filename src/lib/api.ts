@@ -67,7 +67,7 @@ export async function getProjects(params: {
 }): Promise<ProjectListResponse> {
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value) searchParams.set(key, value.toString());
+    if (value && value !== 'all') searchParams.set(key, value.toString());
   });
   
   const response = await fetch(`${API_BASE}/projects?${searchParams.toString()}`);
