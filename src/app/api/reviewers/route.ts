@@ -1,37 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { db, asc } from '@/storage/database/supabase-client';
+import { reviewers } from '@/storage/database/shared/schema';
 
 // 获取审核推送人列表
 export async function GET() {
-  const client = getSupabaseClient();
-  
-  const { data, error } = await client
-    .from('reviewers')
-    .select('*')
-    .order('name');
-  
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-  
+  const data = db
+    .select()
+    .from(reviewers)
+    .orderBy(asc(reviewers.name))
+    .all();
+
   return NextResponse.json({ data: data || [] });
 }
 
-// 初始化审核推送人（高庆强、刘玉春、薛蛟）
+// 新增审核推送人
 export async function POST(request: NextRequest) {
-  const client = getSupabaseClient();
-  
   const body = await request.json();
-  
-  const { data, error } = await client
-    .from('reviewers')
-    .insert({ name: body.name })
-    .select()
-    .single();
-  
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-  
-  return NextResponse.json({ data });
+
+  const result = db
+    .insert(reviewers)
+    .values({ name: body.name })
+    .returning()
+    .get();
+
+  return NextResponse.json({ data: result });
 }

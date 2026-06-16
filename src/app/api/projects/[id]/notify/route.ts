@@ -1,41 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { db, eq } from '@/storage/database/supabase-client';
+import { projects, reviewers } from '@/storage/database/shared/schema';
 
 // 发送审核推送通知
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const client = getSupabaseClient();
   const { id } = await params;
-  
   const body = await request.json();
   const { reviewerName } = body;
-  
+
   // 获取项目信息
-  const { data: project, error: projectError } = await client
-    .from('projects')
-    .select('*')
-    .eq('id', parseInt(id))
-    .single();
-  
-  if (projectError || !project) {
+  const project = db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, parseInt(id)))
+    .get();
+
+  if (!project) {
     return NextResponse.json({ error: '项目不存在' }, { status: 404 });
   }
-  
+
   // 获取审核推送人信息
-  const { data: reviewer, error: reviewerError } = await client
-    .from('reviewers')
-    .select('*')
-    .eq('name', reviewerName)
-    .single();
-  
-  if (reviewerError || !reviewer) {
+  const reviewer = db
+    .select()
+    .from(reviewers)
+    .where(eq(reviewers.name, reviewerName))
+    .get();
+
+  if (!reviewer) {
     return NextResponse.json({ error: '审核推送人不存在' }, { status: 400 });
   }
-  
-  // 在实际应用中，这里应该调用邮件/短信/消息推送服务
-  // 目前仅返回模拟结果
+
   const notification = {
     projectId: parseInt(id),
     projectCode: project.project_code,
@@ -44,7 +41,7 @@ export async function POST(
     message: `项目 ${project.project_code} (${project.company_name}) 需要审核，请及时处理。`,
     sentAt: new Date().toISOString()
   };
-  
+
   return NextResponse.json({
     success: true,
     notification
