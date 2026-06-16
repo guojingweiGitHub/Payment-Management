@@ -1,5 +1,6 @@
 node_modules
 dist
+data.db
 .DS_Store
 *.swp
 .git/*
@@ -53,6 +54,9 @@ output.log
 *.log.*
 logs/
 
+# Local uploads
+public/uploads/*
+!public/uploads/.gitkeep
 # 视频文件
 *.mp4
 *.avi

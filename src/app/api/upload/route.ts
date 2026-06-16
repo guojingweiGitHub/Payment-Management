@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Storage } from 'coze-coding-dev-sdk';
+import { writeFile } from 'fs/promises';
+import path from 'path';
 
 // 允许的文件类型
 const ALLOWED_TYPES = [
@@ -15,13 +16,8 @@ const ALLOWED_TYPES = [
 // 最大文件大小 (10MB)
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-const storage = new S3Storage({
-  endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
-  accessKey: "",
-  secretKey: "",
-  bucketName: process.env.COZE_BUCKET_NAME,
-  region: "cn-beijing",
-});
+// 上传目录
+const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
 
 // 上传文件
 export async function POST(request: NextRequest) {
@@ -50,21 +46,15 @@ export async function POST(request: NextRequest) {
     // 读取文件内容
     const fileBuffer = Buffer.from(await file.arrayBuffer());
     
-    // 生成文件名（保留原始名称）
-    const fileName = `attachments/${Date.now()}_${file.name}`;
+    // 生成唯一文件名
+    const key = `${Date.now()}_${file.name}`;
+    const filePath = path.join(UPLOAD_DIR, key);
     
-    // 上传到对象存储
-    const key = await storage.uploadFile({
-      fileContent: fileBuffer,
-      fileName: fileName,
-      contentType: file.type,
-    });
+    // 写入文件到本地
+    await writeFile(filePath, fileBuffer);
     
-    // 生成访问 URL
-    const url = await storage.generatePresignedUrl({
-      key: key,
-      expireTime: 86400 * 30 // 30天有效期
-    });
+    // 文件访问 URL
+    const url = `/uploads/${key}`;
     
     return NextResponse.json({
       key: key,
@@ -90,16 +80,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '未提供文件 key' }, { status: 400 });
   }
   
-  try {
-    const url = await storage.generatePresignedUrl({
-      key: key,
-      expireTime: 86400 // 1天有效期
-    });
-    
-    return NextResponse.json({ url });
-  } catch (error) {
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : '获取URL失败' 
-    }, { status: 500 });
-  }
+  // 本地文件直接返回相对路径
+  return NextResponse.json({ url: `/uploads/${key}` });
 }
