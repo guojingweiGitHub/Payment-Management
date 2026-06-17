@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 APP_NAME="payment-app"
-APP_DIR="${APP_DIR:-/home/admin/app}"
-BACKUP_DIR="${BACKUP_DIR:-/home/admin/backup}"
+APP_DIR="${APP_DIR:-$(pwd)}"
+BACKUP_DIR="${BACKUP_DIR:-${APP_DIR}/backup}"
 
 echo "========================================="
 echo "  未缴费拿图 - 自动化部署"
