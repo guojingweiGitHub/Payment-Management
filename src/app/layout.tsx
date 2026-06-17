@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Toaster } from 'sonner';
 import { Inspector } from 'react-dev-inspector';
 import './globals.css';
 
@@ -25,6 +26,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`antialiased`}>
         {isDev && <Inspector />}
+        <Toaster position="top-center" richColors />
         {children}
       </body>
     </html>

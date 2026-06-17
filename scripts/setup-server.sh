@@ -1,7 +1,7 @@
 #!/bin/bash
 set -Eeuo pipefail
 
-APP_DIR="/home/admin/app"
+APP_DIR="$(pwd)"
 DOMAIN="${1:-}"
 
 echo "========================================="
