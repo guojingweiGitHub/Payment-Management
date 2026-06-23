@@ -9,25 +9,35 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { 
   getProjects, 
   createProject, 
-  deleteProject, 
-  updateProject,
-  Project 
+  deleteProject,
+  Project
 } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Bell, Upload, FileDown, Percent } from "lucide-react";
+import { AlertTriangle, Bell, Upload, FileDown, Percent, ArrowUp, ArrowDown, ChevronsUpDown, Users } from "lucide-react";
+import { useAuth } from "@/lib/auth-store";
+import AppLayout from "@/components/ui/app-layout";
 
 export default function HomePage() {
   const router = useRouter();
+  const { user } = useAuth();
+  // 直接用 user.role 计算权限，避免 context 传递问题
+  const isAdmin = user?.role === 'admin';
+  const isEditor = user?.role === 'admin' || user?.role === '编辑';
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
+  
+  // 排序
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   
   // 筛选条件
   const [filters, setFilters] = useState({
@@ -48,12 +58,10 @@ export default function HomePage() {
     client_name: "",
     client_phone: "",
     branch_leader_signature: "",
-    registrant: "",
+    registrant: user?.username || "",
     expected_payment_date: "",
     project_manager: "",
     contract_amount: "",
-    agreement_amount: "",
-    actual_amount: "",
     final_amount: ""
   });
   
@@ -74,12 +82,8 @@ export default function HomePage() {
   // 批量打折对话框
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
   const [discountRate, setDiscountRate] = useState("0.95");
-  const [discountFields, setDiscountFields] = useState<string[]>(["agreement_amount", "actual_amount", "final_amount"]);
+  const [discountFields, setDiscountFields] = useState<string[]>(["final_amount"]);
   const [discounting, setDiscounting] = useState(false);
-  
-  // 编辑对话框
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editProject, setEditProject] = useState<Project | null>(null);
   
   // 到期提醒
   const [reminders, setReminders] = useState<{
@@ -96,11 +100,16 @@ export default function HomePage() {
   const loadProjects = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getProjects({
+      const params: any = {
         ...filters,
         page,
         pageSize
-      });
+      };
+      if (sortField) {
+        params.sortField = sortField;
+        params.sortOrder = sortOrder;
+      }
+      const result = await getProjects(params);
       setProjects(result.data);
       setTotal(result.total);
     } catch (error) {
@@ -108,7 +117,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, page, pageSize]);
+  }, [filters, page, pageSize, sortField, sortOrder]);
 
   const loadReminders = useCallback(async () => {
     try {
@@ -143,6 +152,42 @@ export default function HomePage() {
     });
     setPage(1);
   };
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else {
+        setSortField(null);
+        setSortOrder("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+    setPage(1);
+  };
+
+  const renderSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ChevronsUpDown className="h-3 w-3 ml-1 text-gray-300" />;
+    }
+    return sortOrder === "asc" 
+      ? <ArrowUp className="h-3 w-3 ml-1 text-blue-600" />
+      : <ArrowDown className="h-3 w-3 ml-1 text-blue-600" />;
+  };
+
+  const SortableHeader = ({ field, label }: { field: string; label: string }) => (
+    <th 
+      className="px-4 py-3 text-left text-sm font-medium cursor-pointer select-none hover:bg-gray-200"
+      onClick={() => handleSort(field)}
+    >
+      <span className="inline-flex items-center">
+        {label}
+        {renderSortIcon(field)}
+      </span>
+    </th>
+  );
 
   // 文件上传处理
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,12 +241,10 @@ export default function HomePage() {
         client_name: "",
         client_phone: "",
         branch_leader_signature: "",
-        registrant: "",
+        registrant: user?.username || "",
         expected_payment_date: "",
         project_manager: "",
         contract_amount: "",
-        agreement_amount: "",
-        actual_amount: "",
         final_amount: ""
       });
       setAttachments([]);
@@ -219,21 +262,6 @@ export default function HomePage() {
       loadProjects();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "删除失败");
-    }
-  };
-
-  const handleEdit = async () => {
-    if (!editProject) return;
-    try {
-      await updateProject(editProject.id, {
-        payment_status: editProject.payment_status,
-        expected_payment_date: editProject.expected_payment_date
-      });
-      toast.success("更新成功");
-      setEditDialogOpen(false);
-      loadProjects();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "更新失败");
     }
   };
 
@@ -349,6 +377,7 @@ export default function HomePage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
+    <AppLayout>
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* 到期提醒 */}
@@ -357,12 +386,25 @@ export default function HomePage() {
             <Bell className="h-4 w-4 text-orange-600" />
             <AlertTitle className="text-orange-800">到期提醒（7天内）</AlertTitle>
             <AlertDescription className="text-orange-700">
-              共有 {reminders.total} 个项目即将到期或已到期，请及时跟进：
-              {reminders.reminders.slice(0, 3).map((r, i) => (
-                <span key={i} className="ml-2">
-                  {r.registrant}({r.expired}已到期, {r.upcoming}即将到期)
-                </span>
-              ))}
+              <p>共有 {reminders.total} 个项目即将到期或已到期，请及时跟进：</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {reminders.reminders.flatMap(r => r.projects).map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => router.push(`/projects/${p.id}`)}
+                    className={`text-xs px-2 py-1 rounded cursor-pointer hover:underline ${
+                      p.is_expired 
+                        ? 'bg-red-100 text-red-700' 
+                        : 'bg-orange-100 text-orange-700'
+                    }`}
+                  >
+                    {p.project_code}
+                    <span className="ml-1 opacity-70">
+                      ({formatDate(p.expected_payment_date)})
+                    </span>
+                  </button>
+                ))}
+              </div>
             </AlertDescription>
           </Alert>
         )}
@@ -370,9 +412,19 @@ export default function HomePage() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>未缴费拿图台账</span>
+              <span>未缴费台账</span>
               <div className="flex gap-2">
+                {/* 账号管理 */}
+                {isAdmin && (
+                  <Button variant="outline" size="sm" onClick={() => router.push('/admin/users')}>
+                    <Users className="h-4 w-4 mr-1" />
+                    账号管理
+                  </Button>
+                )}
+                
                 {/* 批量导入 */}
+                {isEditor && (
+                <>
                 <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm">
@@ -398,7 +450,7 @@ export default function HomePage() {
                         <p className="text-sm text-gray-600">已选择: {importFile.name}</p>
                       )}
                       <p className="text-xs text-gray-500">
-                        支持字段：拿图日期、单位名称、工程编号、甲方姓名、甲方电话、分院领导签字、登记人、预计缴费日期、项目负责人、合同总额、协议金额、实际金额、决算金额
+                        支持字段：拿图日期、单位名称、工程编号、甲方姓名、甲方电话、分院领导签字、登记人、预计缴费日期、项目负责人、合同总额、决算金额
                       </p>
                     </div>
                     <div className="flex justify-end gap-2">
@@ -441,31 +493,17 @@ export default function HomePage() {
                         <div className="flex gap-4">
                           <div className="flex items-center gap-2">
                             <Checkbox 
-                              id="agreement"
-                              checked={discountFields.includes("agreement_amount")}
+                              id="contract"
+                              checked={discountFields.includes("contract_amount")}
                               onCheckedChange={(checked) => {
                                 if (checked) {
-                                  setDiscountFields([...discountFields, "agreement_amount"]);
+                                  setDiscountFields([...discountFields, "contract_amount"]);
                                 } else {
-                                  setDiscountFields(discountFields.filter(f => f !== "agreement_amount"));
+                                  setDiscountFields(discountFields.filter(f => f !== "contract_amount"));
                                 }
                               }}
                             />
-                            <label htmlFor="agreement" className="text-sm">协议金额</label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Checkbox 
-                              id="actual"
-                              checked={discountFields.includes("actual_amount")}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setDiscountFields([...discountFields, "actual_amount"]);
-                                } else {
-                                  setDiscountFields(discountFields.filter(f => f !== "actual_amount"));
-                                }
-                              }}
-                            />
-                            <label htmlFor="actual" className="text-sm">实际金额</label>
+                            <label htmlFor="contract" className="text-sm">合同总额</label>
                           </div>
                           <div className="flex items-center gap-2">
                             <Checkbox 
@@ -493,8 +531,11 @@ export default function HomePage() {
                     </div>
                   </DialogContent>
                 </Dialog>
+                </>
+                )}
                 
                 {/* 新增申请 */}
+                {isEditor && (
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>新增申请</Button>
@@ -582,26 +623,6 @@ export default function HomePage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="agreement_amount">协议金额</Label>
-                        <Input 
-                          id="agreement_amount" 
-                          type="number" 
-                          step="0.01"
-                          value={formData.agreement_amount}
-                          onChange={(e) => setFormData({...formData, agreement_amount: e.target.value})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="actual_amount">实际金额</Label>
-                        <Input 
-                          id="actual_amount" 
-                          type="number" 
-                          step="0.01"
-                          value={formData.actual_amount}
-                          onChange={(e) => setFormData({...formData, actual_amount: e.target.value})}
-                        />
-                      </div>
-                      <div className="space-y-2">
                         <Label htmlFor="final_amount">决算金额</Label>
                         <Input 
                           id="final_amount" 
@@ -657,6 +678,7 @@ export default function HomePage() {
                     </div>
                   </DialogContent>
                 </Dialog>
+                )}
               </div>
             </CardTitle>
           </CardHeader>
@@ -745,28 +767,26 @@ export default function HomePage() {
                         onCheckedChange={handleSelectAll}
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">工程编号</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">单位名称</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">甲方</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">拿图日期</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">预计缴费</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">合同总额</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">协议金额</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">实际金额</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">决算金额</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">状态</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">到期</th>
+                    <SortableHeader field="project_code" label="工程编号" />
+                    <SortableHeader field="company_name" label="单位名称" />
+                    <SortableHeader field="client_name" label="甲方" />
+                    <SortableHeader field="pickup_date" label="拿图日期" />
+                    <SortableHeader field="expected_payment_date" label="预计缴费" />
+                    <SortableHeader field="contract_amount" label="合同总额" />
+                    <SortableHeader field="final_amount" label="决算金额" />
+                    <SortableHeader field="payment_status" label="状态" />
+                    <SortableHeader field="is_expired" label="到期" />
                     <th className="px-4 py-3 text-left text-sm font-medium">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={13} className="px-4 py-8 text-center text-gray-500">加载中...</td>
+                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">加载中...</td>
                     </tr>
                   ) : projects.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="px-4 py-8 text-center text-gray-500">暂无数据</td>
+                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">暂无数据</td>
                     </tr>
                   ) : projects.map((project) => (
                     <tr key={project.id} className="border-t hover:bg-gray-50">
@@ -785,8 +805,6 @@ export default function HomePage() {
                       <td className="px-4 py-3 text-sm">{formatDate(project.pickup_date)}</td>
                       <td className="px-4 py-3 text-sm">{formatDate(project.expected_payment_date)}</td>
                       <td className="px-4 py-3 text-sm">{formatAmount(project.contract_amount)}</td>
-                      <td className="px-4 py-3 text-sm">{formatAmount(project.agreement_amount)}</td>
-                      <td className="px-4 py-3 text-sm">{formatAmount(project.actual_amount)}</td>
                       <td className="px-4 py-3 text-sm">{formatAmount(project.final_amount)}</td>
                       <td className="px-4 py-3">
                         <Badge variant={project.payment_status === "已缴费" ? "default" : "destructive"}>
@@ -794,9 +812,11 @@ export default function HomePage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={project.is_expired ? "destructive" : "secondary"}>
-                          {project.is_expired ? "已到期" : "未到期"}
-                        </Badge>
+                        {project.payment_status !== "已缴费" && (
+                          <Badge variant={project.is_expired ? "destructive" : "secondary"}>
+                            {project.is_expired ? "已到期" : "未到期"}
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
@@ -807,51 +827,7 @@ export default function HomePage() {
                           >
                             详情
                           </Button>
-                          <Dialog open={editDialogOpen && editProject?.id === project.id} onOpenChange={(open) => {
-                            setEditDialogOpen(open);
-                            if (open) setEditProject(project);
-                            else setEditProject(null);
-                          }}>
-                            <DialogTrigger asChild>
-                              <Button size="sm" variant="outline">编辑</Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>编辑项目</DialogTitle>
-                              </DialogHeader>
-                              {editProject && (
-                                <div className="grid gap-4 py-4">
-                                  <div className="space-y-2">
-                                    <Label>缴费状态</Label>
-                                    <Select 
-                                      value={editProject.payment_status} 
-                                      onValueChange={(v) => setEditProject({...editProject, payment_status: v})}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="未缴费">未缴费</SelectItem>
-                                        <SelectItem value="已缴费">已缴费</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label>预计缴费日期</Label>
-                                    <Input 
-                                      type="date" 
-                                      value={editProject.expected_payment_date.split('T')[0]}
-                                      onChange={(e) => setEditProject({...editProject, expected_payment_date: e.target.value})}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                              <div className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={() => setEditDialogOpen(false)}>取消</Button>
-                                <Button onClick={handleEdit}>保存</Button>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
+                          {isEditor && (
                           <Button 
                             size="sm" 
                             variant="destructive"
@@ -859,6 +835,7 @@ export default function HomePage() {
                           >
                             删除
                           </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -897,5 +874,6 @@ export default function HomePage() {
         </Card>
       </div>
     </div>
+    </AppLayout>
   );
 }

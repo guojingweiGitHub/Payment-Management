@@ -36,8 +36,6 @@ export async function POST(request: NextRequest) {
       '预计缴费日期': 'expected_payment_date',
       '项目负责人': 'project_manager',
       '合同总额': 'contract_amount',
-      '协议金额': 'agreement_amount',
-      '实际金额': 'actual_amount',
       '决算金额': 'final_amount',
     };
 

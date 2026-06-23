@@ -27,10 +27,6 @@ export const projects = sqliteTable(
     project_manager: text("project_manager"),
     // 合同总额
     contract_amount: real("contract_amount"),
-    // 协议金额
-    agreement_amount: real("agreement_amount"),
-    // 实际金额
-    actual_amount: real("actual_amount"),
     // 决算金额
     final_amount: real("final_amount"),
     // 缴费状态（未缴费/已缴费）
@@ -87,5 +83,24 @@ export const reviewers = sqliteTable(
   },
   (table) => [
     index("reviewers_name_idx").on(table.name),
+  ]
+);
+
+// 用户表
+export const users = sqliteTable(
+  "users",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    // 用户名（唯一）
+    username: text("username").notNull().unique(),
+    // 密码哈希
+    password_hash: text("password_hash").notNull(),
+    // 角色：编辑 / 查看
+    role: text("role").default("查看").notNull(),
+    // 创建时间
+    created_at: text("created_at").default("datetime('now')").notNull(),
+  },
+  (table) => [
+    index("users_username_idx").on(table.username),
   ]
 );
