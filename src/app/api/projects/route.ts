@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, eq, like, gte, lte, and, sql, desc } from '@/storage/database/supabase-client';
+import { db, eq, like, gte, lte, and, sql, desc, asc } from '@/storage/database/supabase-client';
 import { projects } from '@/storage/database/shared/schema';
 
 // 获取项目列表
@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
   const expectedDateFrom = searchParams.get('expected_date_from');
   const expectedDateTo = searchParams.get('expected_date_to');
   const daysBeforeExpired = searchParams.get('days_before_expired');
+  const sortField = searchParams.get('sortField');
+  const sortOrder = searchParams.get('sortOrder') || 'asc';
   const page = parseInt(searchParams.get('page') || '1');
   const pageSize = parseInt(searchParams.get('pageSize') || '10');
 
@@ -65,13 +67,33 @@ export async function GET(request: NextRequest) {
     .get();
   const total = countResult?.count || 0;
 
+  // 排序：白名单校验字段名防止 SQL 注入
+  const SORTABLE_FIELDS: Record<string, any> = {
+    project_code: projects.project_code,
+    company_name: projects.company_name,
+    client_name: projects.client_name,
+    pickup_date: projects.pickup_date,
+    expected_payment_date: projects.expected_payment_date,
+    contract_amount: projects.contract_amount,
+    final_amount: projects.final_amount,
+    payment_status: projects.payment_status,
+    is_expired: projects.is_expired,
+    created_at: projects.created_at,
+  };
+
+  let orderByClause = desc(projects.created_at); // 默认按创建时间倒序
+  if (sortField && sortField in SORTABLE_FIELDS) {
+    const field = SORTABLE_FIELDS[sortField];
+    orderByClause = sortOrder === 'desc' ? desc(field) : asc(field);
+  }
+
   // 分页查询
   const offset = (page - 1) * pageSize;
   const data = db
     .select()
     .from(projects)
     .where(whereClause)
-    .orderBy(desc(projects.created_at))
+    .orderBy(orderByClause)
     .limit(pageSize)
     .offset(offset)
     .all();

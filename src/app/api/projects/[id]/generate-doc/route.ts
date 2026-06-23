@@ -105,14 +105,6 @@ export async function POST(
                 children: [
                   new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: '合同总额', bold: true })] })] }),
                   new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatAmount(project.contract_amount) })] })] }),
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: '协议金额', bold: true })] })] }),
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatAmount(project.agreement_amount) })] })] }),
-                ]
-              }),
-              new TableRow({
-                children: [
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: '实际金额', bold: true })] })] }),
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatAmount(project.actual_amount) })] })] }),
                   new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: '决算金额', bold: true })] })] }),
                   new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatAmount(project.final_amount) })] })] }),
                 ]

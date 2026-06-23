@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '未指定要打折的字段' }, { status: 400 });
     }
 
-    const validFields = ['agreement_amount', 'actual_amount', 'final_amount'];
+    const validFields = ['contract_amount', 'final_amount'];
     const invalidFields = fields.filter((f: string) => !validFields.includes(f));
     if (invalidFields.length > 0) {
       return NextResponse.json({ error: `无效的字段: ${invalidFields.join(', ')}` }, { status: 400 });
@@ -44,8 +44,10 @@ export async function POST(request: NextRequest) {
 
       for (const field of fields as string[]) {
         const currentAmount = (project as any)[field];
-        if (currentAmount) {
-          const newAmount = parseFloat(String(currentAmount)) * discount_rate;
+        // 决算金额为空时，使用合同金额作为基准
+        const baseAmount = currentAmount || (field === 'final_amount' ? (project as any).contract_amount : null);
+        if (baseAmount) {
+          const newAmount = parseFloat(String(baseAmount)) * discount_rate;
           updateData[field] = Math.round(newAmount * 100) / 100;
         }
       }

@@ -11,17 +11,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { getProjectDetail, createContactRecord, getReviewers, Project, ContactRecord, Reviewer } from "@/lib/api";
+import { getProjectDetail, createContactRecord, updateProject, Project, ContactRecord } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { FileDown, Upload } from "lucide-react";
+import { FileDown, Upload, Pencil } from "lucide-react";
+import { useAuth } from "@/lib/auth-store";
+import AppLayout from "@/components/ui/app-layout";
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const { user: authUser } = useAuth();
+  const isEditor = authUser?.role === 'admin' || authUser?.role === '编辑';
   const [project, setProject] = useState<Project | null>(null);
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reviewers, setReviewers] = useState<Reviewer[]>([]);
   
   // 新增联系记录对话框
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -36,23 +39,27 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [uploading, setUploading] = useState(false);
   const contactFileRef = useRef<HTMLInputElement>(null);
   
-  // 审核推送对话框
-  const [notifyDialogOpen, setNotifyDialogOpen] = useState(false);
-  const [selectedReviewer, setSelectedReviewer] = useState("");
+  // 编辑对话框
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    pickup_date: "",
+    company_name: "",
+    project_code: "",
+    client_name: "",
+    client_phone: "",
+    branch_leader_signature: "",
+    registrant: "",
+    expected_payment_date: "",
+    project_manager: "",
+    contract_amount: "",
+    final_amount: "",
+    payment_status: ""
+  });
+  const [editSubmitting, setEditSubmitting] = useState(false);
   
   useEffect(() => {
     loadProjectDetail();
-    loadReviewers();
   }, [resolvedParams.id]);
-  
-  const loadReviewers = async () => {
-    try {
-      const result = await getReviewers();
-      setReviewers(result);
-    } catch (error) {
-      console.error('加载审核推送人失败:', error);
-    }
-  };
   
   const loadProjectDetail = async () => {
     setLoading(true);
@@ -119,54 +126,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     }
   };
   
-  const handleNotify = async () => {
-    if (!selectedReviewer) {
-      toast.error("请选择审核推送人");
-      return;
-    }
-    try {
-      const response = await fetch(`/api/projects/${resolvedParams.id}/notify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewerName: selectedReviewer })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        toast.success(`已向 ${selectedReviewer} 发送审核通知`);
-        setNotifyDialogOpen(false);
-      } else {
-        toast.error(data.error || "发送失败");
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "发送失败");
-    }
-  };
-  
   // 生成Word文档
-  const handleGenerateDoc = async () => {
-    try {
-      const response = await fetch(`/api/projects/${resolvedParams.id}/generate-doc`, {
-        method: 'POST'
-      });
-      
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || '生成失败');
-      }
-      
-      // 下载文件
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `项目_${project?.project_code}_收款单.docx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('文档已生成');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '生成失败');
-    }
+  const handleGenerateDoc = () => {
+    toast.info('该功能开发中，敬请期待');
   };
   
   const formatDate = (dateStr: string) => {
@@ -182,6 +144,40 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const formatAmount = (amount: string | null) => {
     if (!amount) return "-";
     return `¥${parseFloat(amount).toLocaleString()}`;
+  };
+  
+  const openEditDialog = () => {
+    if (!project) return;
+    setEditForm({
+      pickup_date: project.pickup_date ? project.pickup_date.split('T')[0] : "",
+      company_name: project.company_name || "",
+      project_code: project.project_code || "",
+      client_name: project.client_name || "",
+      client_phone: project.client_phone || "",
+      branch_leader_signature: project.branch_leader_signature || "",
+      registrant: project.registrant || "",
+      expected_payment_date: project.expected_payment_date ? project.expected_payment_date.split('T')[0] : "",
+      project_manager: project.project_manager || "",
+      contract_amount: project.contract_amount || "",
+      final_amount: project.final_amount || "",
+      payment_status: project.payment_status || "未缴费"
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!project) return;
+    setEditSubmitting(true);
+    try {
+      await updateProject(project.id, editForm);
+      toast.success("更新成功");
+      setEditDialogOpen(false);
+      loadProjectDetail();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "更新失败");
+    } finally {
+      setEditSubmitting(false);
+    }
   };
   
   const getFileIcon = (type: string) => {
@@ -202,12 +198,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   if (!project) {
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <div className="text-gray-500">项目不存在</div>
       </div>
-    );
+  );
   }
-  
   return (
+    <AppLayout>
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto">
         {/* 返回按钮 */}
@@ -225,44 +220,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <FileDown className="h-4 w-4 mr-1" />
                   生成文档
                 </Button>
+                {isEditor && (
+                <Button size="sm" variant="outline" onClick={openEditDialog}>
+                  <Pencil className="h-4 w-4 mr-1" />
+                  编辑
+                </Button>
+                )}
                 <Badge variant={project.payment_status === "已缴费" ? "default" : "destructive"}>
                   {project.payment_status}
                 </Badge>
                 <Badge variant={project.is_expired ? "destructive" : "secondary"}>
                   {project.is_expired ? "已到期" : "未到期"}
                 </Badge>
-                <Dialog open={notifyDialogOpen} onOpenChange={setNotifyDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline">审核推送</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>审核推送</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <Label>选择推送人</Label>
-                      <Select value={selectedReviewer} onValueChange={setSelectedReviewer}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择审核推送人" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {reviewers.length === 0 ? (
-                            <SelectItem value="高庆强">高庆强</SelectItem>
-                          ) : reviewers.map((r) => (
-                            <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-gray-500">
-                        将向选定的审核推送人发送项目审核通知
-                      </p>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => setNotifyDialogOpen(false)}>取消</Button>
-                      <Button onClick={handleNotify}>发送</Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
               </div>
             </CardTitle>
           </CardHeader>
@@ -321,14 +290,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <p className="text-lg font-medium">{formatAmount(project.contract_amount)}</p>
                 </div>
                 <div>
-                  <Label className="text-gray-400">协议金额</Label>
-                  <p className="text-lg font-medium">{formatAmount(project.agreement_amount)}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-400">实际金额</Label>
-                  <p className="text-lg font-medium">{formatAmount(project.actual_amount)}</p>
-                </div>
-                <div>
                   <Label className="text-gray-400">决算金额</Label>
                   <p className="text-lg font-medium">{formatAmount(project.final_amount)}</p>
                 </div>
@@ -369,6 +330,88 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             )}
           </CardContent>
         </Card>
+        
+        {/* 编辑对话框 */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>编辑项目 - {project.project_code}</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_pickup_date">拿图日期 *</Label>
+                <Input id="edit_pickup_date" type="date" value={editForm.pickup_date}
+                  onChange={(e) => setEditForm({...editForm, pickup_date: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_company_name">单位名称 *</Label>
+                <Input id="edit_company_name" value={editForm.company_name}
+                  onChange={(e) => setEditForm({...editForm, company_name: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_project_code">工程编号 *</Label>
+                <Input id="edit_project_code" value={editForm.project_code}
+                  onChange={(e) => setEditForm({...editForm, project_code: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_client_name">甲方姓名 *</Label>
+                <Input id="edit_client_name" value={editForm.client_name}
+                  onChange={(e) => setEditForm({...editForm, client_name: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_client_phone">甲方电话 *</Label>
+                <Input id="edit_client_phone" value={editForm.client_phone}
+                  onChange={(e) => setEditForm({...editForm, client_phone: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_registrant">登记人 *</Label>
+                <Input id="edit_registrant" value={editForm.registrant}
+                  onChange={(e) => setEditForm({...editForm, registrant: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_expected_date">预计缴费日期 *</Label>
+                <Input id="edit_expected_date" type="date" value={editForm.expected_payment_date}
+                  onChange={(e) => setEditForm({...editForm, expected_payment_date: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_project_manager">项目负责人</Label>
+                <Input id="edit_project_manager" value={editForm.project_manager}
+                  onChange={(e) => setEditForm({...editForm, project_manager: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_contract_amount">合同总额</Label>
+                <Input id="edit_contract_amount" type="number" step="0.01" value={editForm.contract_amount}
+                  onChange={(e) => setEditForm({...editForm, contract_amount: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_final_amount">决算金额</Label>
+                <Input id="edit_final_amount" type="number" step="0.01" value={editForm.final_amount}
+                  onChange={(e) => setEditForm({...editForm, final_amount: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_branch_leader">分院领导签字</Label>
+                <Input id="edit_branch_leader" value={editForm.branch_leader_signature}
+                  onChange={(e) => setEditForm({...editForm, branch_leader_signature: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_payment_status">缴费状态</Label>
+                <Select value={editForm.payment_status} onValueChange={(v) => setEditForm({...editForm, payment_status: v})}>
+                  <SelectTrigger id="edit_payment_status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="未缴费">未缴费</SelectItem>
+                    <SelectItem value="已缴费">已缴费</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>取消</Button>
+              <Button onClick={handleUpdate} disabled={editSubmitting}>
+                {editSubmitting ? '保存中...' : '保存'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         
         {/* 联系记录 */}
         <Card>
@@ -508,5 +551,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </Card>
       </div>
     </div>
+    </AppLayout>
   );
 }

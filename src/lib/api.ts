@@ -15,8 +15,6 @@ export interface Project {
   is_expired: boolean;
   project_manager: string | null;
   contract_amount: string | null;
-  agreement_amount: string | null;
-  actual_amount: string | null;
   final_amount: string | null;
   payment_status: string;
   attachments: Array<{key: string; name: string; type: string; size: number}> | null;
@@ -65,6 +63,8 @@ export async function getProjects(params: {
   expected_date_from?: string;
   expected_date_to?: string;
   days_before_expired?: string;
+  sortField?: string;
+  sortOrder?: string;
   page?: number;
   pageSize?: number;
 }): Promise<ProjectListResponse> {
@@ -95,8 +95,6 @@ export async function createProject(project: {
   expected_payment_date: string;
   project_manager?: string;
   contract_amount?: string;
-  agreement_amount?: string;
-  actual_amount?: string;
   final_amount?: string;
   attachments?: Array<{key: string; name: string; type: string; size: number}>;
 }): Promise<Project> {
