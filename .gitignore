@@ -162,6 +162,9 @@ Desktop.ini
 # Optional files
 *.tgz
 *.tar
+
+# 部署缓存（脚本保留，二进制忽略）
+/nodejs/
 # TypeScript
 *.tsbuildinfo
 # Misc

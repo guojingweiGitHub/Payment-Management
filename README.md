@@ -1,363 +1,204 @@
-# projects
+# 未缴费台账管理系统
 
-这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
+项目收款管理台账系统，支持多条件查询筛选、批量导入/打折、缴费状态跟踪、到期提醒与用户权限管理。
+
+## 功能概览
+
+- **台账列表** — 项目收款数据展示，支持工程编号/单位名称/甲方电话/缴费状态/是否到期等多条件筛选
+- **新增申请** — 录入项目信息，含工程编号唯一性校验，登记人自动填充当前用户
+- **批量导入** — Excel 批量导入项目数据，自动校验必填字段与工程编号重复
+- **批量打折** — 选中项目批量按折扣比例更新决算金额，当决算为空时自动用合同金额计算
+- **工程详情** — 查看完整项目信息、联系记录，支持编辑全部字段
+- **到期提醒** — 7 天内即将到期项目高亮提示，可点击工程编号跳转详情
+- **列排序** — 表头点击切换正序/倒序排列
+- **用户权限** — 三级角色（管理员/编辑/查看），精细控制数据操作权限
+
+## 技术栈
+
+| 类别 | 技术 |
+|------|------|
+| 框架 | Next.js 16 (App Router) |
+| 语言 | TypeScript 5 |
+| UI | shadcn/ui (Radix UI) + Tailwind CSS 4 |
+| 数据库 | SQLite (better-sqlite3 + Drizzle ORM) |
+| 图标 | Lucide React |
+| 表单 | React Hook Form |
+| 包管理 | pnpm 9+ |
 
 ## 快速开始
 
-### 启动开发服务器
+### 环境要求
+
+- Node.js 20+
+- pnpm 9+
+
+### 开发模式
 
 ```bash
-coze dev
+pnpm install
+pnpm dev
 ```
 
-启动后，在浏览器中打开 [http://localhost:5000](http://localhost:5000) 查看应用。
+访问 http://localhost:5000
 
-开发服务器支持热更新，修改代码后页面会自动刷新。
+> **注意**：开发模式使用 Turbopack 可能出现稳定性问题，若遇页面反复刷新，改用生产模式启动。
 
-### 构建生产版本
+### 生产模式
 
 ```bash
-coze build
+pnpm build
+NODE_ENV=production HOSTNAME=0.0.0.0 PORT=5000 node dist/server.js
 ```
 
-### 启动生产服务器
-
-```bash
-coze start
-```
+访问 http://localhost:5000
 
 ## 项目结构
 
 ```
 src/
-├── app/                      # Next.js App Router 目录
-│   ├── layout.tsx           # 根布局组件
-│   ├── page.tsx             # 首页
-│   ├── globals.css          # 全局样式（包含 shadcn 主题变量）
-│   └── [route]/             # 其他路由页面
-├── components/              # React 组件目录
-│   └── ui/                  # shadcn/ui 基础组件（优先使用）
-│       ├── button.tsx
-│       ├── card.tsx
-│       └── ...
-├── lib/                     # 工具函数库
-│   └── utils.ts            # cn() 等工具函数
-└── hooks/                   # 自定义 React Hooks（可选）
+├── app/
+│   ├── admin/users/          # 账号管理页（仅管理员）
+│   ├── api/
+│   │   ├── auth/             # 登录/登出/鉴权
+│   │   ├── projects/         # 项目 CRUD + 批量导入/打折 + 生成文档
+│   │   ├── reminders/        # 到期提醒
+│   │   ├── reviewers/        # 审核推送人（保留，未使用）
+│   │   ├── upload/           # 文件上传
+│   │   └── users/            # 用户管理
+│   ├── login/                # 登录页
+│   ├── projects/[id]/        # 项目详情页
+│   ├── layout.tsx            # 根布局
+│   ├── page.tsx              # 台账首页
+│   └── globals.css           # 全局样式
+├── components/ui/            # shadcn/ui 组件库 + AppLayout
+├── lib/
+│   ├── api.ts                # 前端 API 调用封装
+│   ├── auth-store.ts         # 全局认证状态管理
+│   ├── auth.ts               # 服务端认证逻辑
+│   └── utils.ts              # cn() 工具函数
+├── storage/database/
+│   ├── shared/schema.ts      # Drizzle ORM 表定义
+│   └── supabase-client.ts    # 数据库客户端（实际使用 SQLite）
+└── server.ts                 # 自定义服务器入口（含自动迁移）
 
-server/
-├── index.ts                 # 自定义服务器入口
-├── tsconfig.json           # Server TypeScript 配置
-└── dist/                    # 编译输出目录（自动生成）
+scripts/
+├── dev.sh                    # 开发启动脚本
+├── build.sh                  # 构建脚本
+├── start.sh                  # 生产启动脚本
+├── deploy.sh                 # 部署脚本
+└── setup-server.sh           # 服务器环境搭建脚本
 ```
 
-## 核心开发规范
+## 数据库
 
-### 1. 组件开发
+使用 SQLite 本地文件数据库，Drizzle ORM 管理表结构。
 
-**优先使用 shadcn/ui 基础组件**
+### 表结构
 
-本项目已预装完整的 shadcn/ui 组件库，位于 `src/components/ui/` 目录。开发时应优先使用这些组件作为基础：
+**projects** — 项目收款管理表
 
-```tsx
-// ✅ 推荐：使用 shadcn 基础组件
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER | 主键 |
+| pickup_date | TEXT | 拿图日期 |
+| company_name | TEXT | 单位名称 |
+| project_code | TEXT | 工程编号（唯一） |
+| client_name | TEXT | 甲方姓名 |
+| client_phone | TEXT | 甲方电话 |
+| branch_leader_signature | TEXT | 分院领导签字 |
+| registrant | TEXT | 登记人 |
+| expected_payment_date | TEXT | 预计缴费日期 |
+| is_expired | INTEGER | 是否到期 |
+| project_manager | TEXT | 项目负责人 |
+| contract_amount | REAL | 合同总额 |
+| final_amount | REAL | 决算金额 |
+| payment_status | TEXT | 缴费状态（未缴费/已缴费） |
+| attachments | TEXT | 附件（JSON） |
+| created_at | TEXT | 创建时间 |
+| updated_at | TEXT | 更新时间 |
 
-export default function MyComponent() {
-  return (
-    <Card>
-      <CardHeader>标题</CardHeader>
-      <CardContent>
-        <Input placeholder="输入内容" />
-        <Button>提交</Button>
-      </CardContent>
-    </Card>
-  );
-}
-```
+**contact_records** — 联系记录表
 
-**可用的 shadcn 组件清单**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER | 主键 |
+| project_id | INTEGER | 关联项目 |
+| contact_time | TEXT | 联系时间 |
+| delay_reason | TEXT | 延期说明 |
+| notes | TEXT | 备注 |
+| attachments | TEXT | 附件（JSON） |
+| created_at | TEXT | 创建时间 |
 
-- 表单：`button`, `input`, `textarea`, `select`, `checkbox`, `radio-group`, `switch`, `slider`
-- 布局：`card`, `separator`, `tabs`, `accordion`, `collapsible`, `scroll-area`
-- 反馈：`alert`, `alert-dialog`, `dialog`, `toast`, `sonner`, `progress`
-- 导航：`dropdown-menu`, `menubar`, `navigation-menu`, `context-menu`
-- 数据展示：`table`, `avatar`, `badge`, `hover-card`, `tooltip`, `popover`
-- 其他：`calendar`, `command`, `carousel`, `resizable`, `sidebar`
+**users** — 用户表
 
-详见 `src/components/ui/` 目录下的具体组件实现。
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER | 主键 |
+| username | TEXT | 用户名（唯一） |
+| password_hash | TEXT | 密码哈希 |
+| role | TEXT | 角色（admin/编辑/查看） |
+| created_at | TEXT | 创建时间 |
 
-### 2. 路由开发
+### 迁移
 
-Next.js 使用文件系统路由，在 `src/app/` 目录下创建文件夹即可添加路由：
+开发模式下启动时自动执行 `drizzle-kit push`。生产部署前运行：
 
 ```bash
-# 创建新路由 /about
-src/app/about/page.tsx
-
-# 创建动态路由 /posts/[id]
-src/app/posts/[id]/page.tsx
-
-# 创建路由组（不影响 URL）
-src/app/(marketing)/about/page.tsx
-
-# 创建 API 路由
-src/app/api/users/route.ts
+npx drizzle-kit push --force
 ```
 
-**页面组件示例**
+## 用户权限
 
-```tsx
-// src/app/about/page.tsx
-import { Button } from '@/components/ui/button';
+| 角色 | 权限 |
+|------|------|
+| **管理员 (admin)** | 全部权限：台账增删改查、批量操作、账号管理 |
+| **编辑** | 台账增删改查、批量操作（不可管理账号） |
+| **查看** | 仅可查看台账列表和详情，不可修改任何数据 |
 
-export const metadata = {
-  title: '关于我们',
-  description: '关于页面描述',
-};
+默认管理员账号：`admin` / `admin123`（首次启动自动创建）
 
-export default function AboutPage() {
-  return (
-    <div>
-      <h1>关于我们</h1>
-      <Button>了解更多</Button>
-    </div>
-  );
-}
-```
+## API 接口
 
-**动态路由示例**
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/auth/login` | POST | 用户登录 |
+| `/api/auth/logout` | POST | 退出登录 |
+| `/api/auth/me` | GET | 获取当前用户 |
+| `/api/projects` | GET | 项目列表（支持筛选/排序/分页） |
+| `/api/projects` | POST | 新增项目 |
+| `/api/projects/[id]` | GET | 项目详情（含联系记录） |
+| `/api/projects/[id]` | PUT | 更新项目 |
+| `/api/projects/[id]` | DELETE | 删除项目 |
+| `/api/projects/[id]/contacts` | GET/POST | 联系记录查询/新增 |
+| `/api/projects/batch-import` | POST | Excel 批量导入 |
+| `/api/projects/batch-update` | POST | 批量打折 |
+| `/api/projects/[id]/generate-doc` | POST | 生成 Word 文档（开发中） |
+| `/api/reminders` | GET | 到期提醒 |
+| `/api/users` | GET/POST | 用户列表/新增用户 |
+| `/api/users/[id]` | PUT/DELETE | 更新/删除用户 |
+| `/api/upload` | POST | 文件上传 |
 
-```tsx
-// src/app/posts/[id]/page.tsx
-export default async function PostPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+## 部署
 
-  return <div>文章 ID: {id}</div>;
-}
-```
-
-**API 路由示例**
-
-```tsx
-// src/app/api/users/route.ts
-import { NextResponse } from 'next/server';
-
-export async function GET() {
-  return NextResponse.json({ users: [] });
-}
-
-export async function POST(request: Request) {
-  const body = await request.json();
-  return NextResponse.json({ success: true });
-}
-```
-
-### 3. 依赖管理
-
-**必须使用 pnpm 管理依赖**
+### Ubuntu 24.04
 
 ```bash
-# ✅ 安装依赖
-pnpm install
+# 1. 环境搭建
+bash scripts/setup-server.sh your-domain.com
 
-# ✅ 添加新依赖
-pnpm add package-name
+# 2. 上传代码后安装依赖
+cd /path/to/project
+pnpm install --no-frozen-lockfile
 
-# ✅ 添加开发依赖
-pnpm add -D package-name
-
-# ❌ 禁止使用 npm 或 yarn
-# npm install  # 错误！
-# yarn add     # 错误！
+# 3. 部署
+bash scripts/deploy.sh
 ```
 
-项目已配置 `preinstall` 脚本，使用其他包管理器会报错。
+部署前需确保服务器已安装 `build-essential` 和 `python3`（better-sqlite3 编译所需）。
 
-### 4. 样式开发
+## 开发规范
 
-**使用 Tailwind CSS v4**
-
-本项目使用 Tailwind CSS v4 进行样式开发，并已配置 shadcn 主题变量。
-
-```tsx
-// 使用 Tailwind 类名
-<div className="flex items-center gap-4 p-4 rounded-lg bg-background">
-  <Button className="bg-primary text-primary-foreground">
-    主要按钮
-  </Button>
-</div>
-
-// 使用 cn() 工具函数合并类名
-import { cn } from '@/lib/utils';
-
-<div className={cn(
-  "base-class",
-  condition && "conditional-class",
-  className
-)}>
-  内容
-</div>
-```
-
-**主题变量**
-
-主题变量定义在 `src/app/globals.css` 中，支持亮色/暗色模式：
-
-- `--background`, `--foreground`
-- `--primary`, `--primary-foreground`
-- `--secondary`, `--secondary-foreground`
-- `--muted`, `--muted-foreground`
-- `--accent`, `--accent-foreground`
-- `--destructive`, `--destructive-foreground`
-- `--border`, `--input`, `--ring`
-
-### 5. 表单开发
-
-推荐使用 `react-hook-form` + `zod` 进行表单开发：
-
-```tsx
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-
-const formSchema = z.object({
-  username: z.string().min(2, '用户名至少 2 个字符'),
-  email: z.string().email('请输入有效的邮箱'),
-});
-
-export default function MyForm() {
-  const form = useForm({
-    resolver: zodResolver(formSchema),
-    defaultValues: { username: '', email: '' },
-  });
-
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
-    console.log(data);
-  };
-
-  return (
-    <form onSubmit={form.handleSubmit(onSubmit)}>
-      <Input {...form.register('username')} />
-      <Input {...form.register('email')} />
-      <Button type="submit">提交</Button>
-    </form>
-  );
-}
-```
-
-### 6. 数据获取
-
-**服务端组件（推荐）**
-
-```tsx
-// src/app/posts/page.tsx
-async function getPosts() {
-  const res = await fetch('https://api.example.com/posts', {
-    cache: 'no-store', // 或 'force-cache'
-  });
-  return res.json();
-}
-
-export default async function PostsPage() {
-  const posts = await getPosts();
-
-  return (
-    <div>
-      {posts.map(post => (
-        <div key={post.id}>{post.title}</div>
-      ))}
-    </div>
-  );
-}
-```
-
-**客户端组件**
-
-```tsx
-'use client';
-
-import { useEffect, useState } from 'react';
-
-export default function ClientComponent() {
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    fetch('/api/data')
-      .then(res => res.json())
-      .then(setData);
-  }, []);
-
-  return <div>{JSON.stringify(data)}</div>;
-}
-```
-
-## 常见开发场景
-
-### 添加新页面
-
-1. 在 `src/app/` 下创建文件夹和 `page.tsx`
-2. 使用 shadcn 组件构建 UI
-3. 根据需要添加 `layout.tsx` 和 `loading.tsx`
-
-### 创建业务组件
-
-1. 在 `src/components/` 下创建组件文件（非 UI 组件）
-2. 优先组合使用 `src/components/ui/` 中的基础组件
-3. 使用 TypeScript 定义 Props 类型
-
-### 添加全局状态
-
-推荐使用 React Context 或 Zustand：
-
-```tsx
-// src/lib/store.ts
-import { create } from 'zustand';
-
-interface Store {
-  count: number;
-  increment: () => void;
-}
-
-export const useStore = create<Store>((set) => ({
-  count: 0,
-  increment: () => set((state) => ({ count: state.count + 1 })),
-}));
-```
-
-### 集成数据库
-
-推荐使用 Prisma 或 Drizzle ORM，在 `src/lib/db.ts` 中配置。
-
-## 技术栈
-
-- **框架**: Next.js 16.1.1 (App Router)
-- **UI 组件**: shadcn/ui (基于 Radix UI)
-- **样式**: Tailwind CSS v4
-- **表单**: React Hook Form + Zod
-- **图标**: Lucide React
-- **字体**: Geist Sans & Geist Mono
-- **包管理器**: pnpm 9+
-- **TypeScript**: 5.x
-
-## 参考文档
-
-- [Next.js 官方文档](https://nextjs.org/docs)
-- [shadcn/ui 组件文档](https://ui.shadcn.com)
-- [Tailwind CSS 文档](https://tailwindcss.com/docs)
-- [React Hook Form](https://react-hook-form.com)
-
-## 重要提示
-
-1. **必须使用 pnpm** 作为包管理器
-2. **优先使用 shadcn/ui 组件** 而不是从零开发基础组件
-3. **遵循 Next.js App Router 规范**，正确区分服务端/客户端组件
-4. **使用 TypeScript** 进行类型安全开发
-5. **使用 `@/` 路径别名** 导入模块（已配置）
+- 必须使用 pnpm，禁止 npm/yarn
+- 字段名使用 snake_case（如 `created_at`）
+- 每次数据库操作检查 `{ data, error }` 并处理错误
+- 状态颜色：未缴费→橙色/红色，已缴费→绿色
