@@ -24,7 +24,8 @@ fi
 
 # 2. 拉取最新代码
 echo ""
-echo "[2/7] 拉取代码..."
+echo "[2/7] 拉取代码（丢弃所有本地未提交修改）..."
+git checkout .
 git pull 2>/dev/null && echo "  ✓ 代码已更新" || echo "  ⚠ 未检测到 git 仓库或拉取失败，继续部署"
 
 # 3. 安装依赖
